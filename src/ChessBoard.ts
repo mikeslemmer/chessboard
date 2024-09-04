@@ -136,14 +136,15 @@ export class ChessBoard {
     }
 
     // Generates a compressed base-64 of the board.
+    /*
     public toBase64(): string {
-
+        const bitVector = this.board.reduce<
 
 
 
         return '';
 
     }
-
+*/
 
 }
