@@ -158,7 +158,6 @@ export class ChessBoard {
                             break;
                         case 'p':
                             if (i === 3 && this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j]}6`) {
-                                console.log('GOT HERE');
                                 pieceCode = 12;
                             } else {
                                 pieceCode = 1;
