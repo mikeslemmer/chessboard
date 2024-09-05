@@ -136,15 +136,85 @@ export class ChessBoard {
     }
 
     // Generates a compressed base-64 of the board.
-    /*
+    
     public toBase64(): string {
-        const bitVector = this.board.reduce<
+        let pieces: number[] = [];
+        let firstNibble = true;
+        const bitVector: number[] = this.board.map((row) => {
+            let ret = 0;
+            for (let i = 0, bit = 1; i < 8; i++, bit <<= 1) {
+                const col = row[i];
+                if (col !== '') {
+                    ret |= bit;
+                    let pieceCode: number;
+                    switch(col) {
+                        case 'P':   pieceCode = 0; break;
+                        case 'p':   pieceCode = 1; break;
+                        case 'N':   pieceCode = 2; break;
+                        case 'n':   pieceCode = 3; break;
+                        case 'B':   pieceCode = 4; break;
+                        case 'b':   pieceCode = 5; break;
+                        case 'R':   pieceCode = 6; break;
+                        case 'r':   pieceCode = 7; break;
+                        case 'Q':   pieceCode = 8; break;
+                        case 'q':   pieceCode = 9; break;
+                        case 'K':   pieceCode = 10; break;
+                        case 'k':   pieceCode = 11; break;
+                        default:    throw `toBase64: Invalid piece found in row: ${row}`
+                    }
+                    if (firstNibble) {
+                        pieces.push(pieceCode);
+                    } else {
+                        pieces[pieces.length - 1] |= pieceCode << 4;
+                    }
+                    firstNibble = !firstNibble;
+                }
+            }
+            return ret;
+        });
 
-
-
-        return '';
-
+        console.log(pieces);
+        return Buffer.from([...bitVector, ...pieces]).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
     }
-*/
+
+
+    public static fromBase64(base64Str: string): ChessBoard {
+        const buffer = Buffer.from(base64Str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (base64Str.length % 4)) % 4), 'base64');
+        const board: string[][] = [];
+        let pieceNum = 0;
+        for (let i = 0; i < 8; i++) {
+            board.push(Array(8).fill(''));
+            for (let j = 0; j < 8; j++) {
+                if (buffer[i] & (1 << j)) {
+                    let pieceCode = buffer[8 + Math.floor(pieceNum / 2)];
+                    if (pieceNum & 1) {
+                        pieceCode >>= 4;
+                    } else {
+                        pieceCode &= 15;
+                    }
+                    pieceNum++;
+                    let piece = '';
+                    switch(pieceCode) {
+                        case 0:     piece = 'P'; break;
+                        case 1:     piece = 'p'; break;
+                        case 2:     piece = 'N'; break;
+                        case 3:     piece = 'n'; break;
+                        case 4:     piece = 'B'; break;
+                        case 5:     piece = 'b'; break;
+                        case 6:     piece = 'R'; break;
+                        case 7:     piece = 'r'; break;
+                        case 8:     piece = 'Q'; break;
+                        case 9:     piece = 'q'; break;
+                        case 10:    piece = 'K'; break;
+                        case 11:    piece = 'k'; break;
+                    }
+                    board[i][j] = piece;
+                    
+                }         
+            }
+        }
+
+        return new ChessBoard(board, 'w', new Set(), '', 0, 1);
+    }
 
 }
