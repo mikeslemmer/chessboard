@@ -20,7 +20,6 @@ describe('FEN Import / Export', () => {
             const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
             const board = ChessBoard.fromFEN(fen);
             expect(board.toFEN()).toBe(fen);
-            console.log(board.toBase64());
         }
         {
             const fen = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2';
@@ -46,7 +45,6 @@ describe('Base64 Import / Export', () => {
         const board = ChessBoard.fromBase64(base64Str);
 
         const arr = board.toArray();
-        console.log(arr);
         expect(arr[0][0]).toBe('r');
         expect(arr[1][1]).toBe('p');
         expect(arr[2][2]).toBe('');
@@ -54,7 +52,22 @@ describe('Base64 Import / Export', () => {
         expect(arr[7][7]).toBe('R');
 
         expect(board.toFEN()).toBe(fen);
-
     });
+
+    it('should handle a more complex fen', () => {
+        const fen = '1r2kr2/pp1p1pp1/2p4p/7P/P1PP4/1P6/5PP1/R3K2R b KQ - 0 1';        
+        const origBoard = ChessBoard.fromFEN(fen);
+        const base64Str = origBoard.toBase64();
+        const board = ChessBoard.fromBase64(base64Str);
+        expect(board.toFEN()).toBe(fen);
+    });
+
+    it('should handle another more complex fen', () => {
+        const fen = '1r2kr2/pp1p1p2/2p4p/6pP/P1PP4/1P6/5PP1/R3K2R w KQ g6 0 1';
+        const origBoard = ChessBoard.fromFEN(fen);
+        const base64Str = origBoard.toBase64();
+        const board = ChessBoard.fromBase64(base64Str);
+        expect(board.toFEN()).toBe(fen);
+    });   
 
 });

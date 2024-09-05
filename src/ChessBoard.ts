@@ -1,6 +1,7 @@
 export class ChessBoard {
 
     static readonly VALID_PIECES = new Set('rnbkqpRNBKQP'.split(''));
+    static readonly COLS_TO_LETTERS = 'abcdefgh'.split('');
 
     private board: string[][];
     private activeColor: string;
@@ -40,7 +41,7 @@ export class ChessBoard {
         const arrayBoard = splitBoard.map((row) => {
             const cols = row.split('');
             const ret = cols.reduce<string[]>((acc, col) => {
-                if (this.VALID_PIECES.has(col)) {
+                if (ChessBoard.VALID_PIECES.has(col)) {
                     acc.push(col);
                 } else {
                     try {
@@ -140,26 +141,51 @@ export class ChessBoard {
     public toBase64(): string {
         let pieces: number[] = [];
         let firstNibble = true;
-        const bitVector: number[] = this.board.map((row) => {
+        const bitVector: number[] = this.board.map((row, i) => {
             let ret = 0;
-            for (let i = 0, bit = 1; i < 8; i++, bit <<= 1) {
-                const col = row[i];
+            for (let j = 0, bit = 1; j < 8; j++, bit <<= 1) {
+                const col = row[j];
                 if (col !== '') {
                     ret |= bit;
                     let pieceCode: number;
                     switch(col) {
-                        case 'P':   pieceCode = 0; break;
-                        case 'p':   pieceCode = 1; break;
+                        case 'P':
+                            if (i === 4 && this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j]}3`) {
+                                pieceCode = 12;
+                            } else {
+                                pieceCode = 0;
+                            } 
+                            break;
+                        case 'p':
+                            if (i === 3 && this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j]}6`) {
+                                console.log('GOT HERE');
+                                pieceCode = 12;
+                            } else {
+                                pieceCode = 1;
+                            } 
+                            break;
                         case 'N':   pieceCode = 2; break;
                         case 'n':   pieceCode = 3; break;
                         case 'B':   pieceCode = 4; break;
                         case 'b':   pieceCode = 5; break;
-                        case 'R':   pieceCode = 6; break;
-                        case 'r':   pieceCode = 7; break;
+                        case 'R':
+                            if (i === 7 && (j === 0 && this.canCastle.has('Q')) || j === 7 && this.canCastle.has('K'))  {
+                                pieceCode = 13;
+                            } else {
+                                pieceCode = 6;
+                            }
+                            break;
+                        case 'r':   
+                            if (i === 0 && (j === 0 && this.canCastle.has('q')) || j === 7 && this.canCastle.has('k'))  {
+                                pieceCode = 14;
+                            } else {
+                                pieceCode = 7;
+                            }
+                            break;
                         case 'Q':   pieceCode = 8; break;
                         case 'q':   pieceCode = 9; break;
                         case 'K':   pieceCode = 10; break;
-                        case 'k':   pieceCode = 11; break;
+                        case 'k':   pieceCode = (this.activeColor === 'b') ? 15 : 11; break;
                         default:    throw `toBase64: Invalid piece found in row: ${row}`
                     }
                     if (firstNibble) {
@@ -173,7 +199,6 @@ export class ChessBoard {
             return ret;
         });
 
-        console.log(pieces);
         return Buffer.from([...bitVector, ...pieces]).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
     }
 
@@ -181,7 +206,10 @@ export class ChessBoard {
     public static fromBase64(base64Str: string): ChessBoard {
         const buffer = Buffer.from(base64Str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (base64Str.length % 4)) % 4), 'base64');
         const board: string[][] = [];
+        const canCastle = new Set<string>();
+        let activeColor = 'w';
         let pieceNum = 0;
+        let enPassantTargetSquare = '-';
         for (let i = 0; i < 8; i++) {
             board.push(Array(8).fill(''));
             for (let j = 0; j < 8; j++) {
@@ -207,6 +235,18 @@ export class ChessBoard {
                         case 9:     piece = 'q'; break;
                         case 10:    piece = 'K'; break;
                         case 11:    piece = 'k'; break;
+                        case 12:    
+                            if (i === 3) {
+                                enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}6`;
+                                piece = 'p';
+                            } else { // i === 5
+                                enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}3`;
+                                piece = 'P';
+                            }
+                            break;
+                        case 13:    piece = 'R'; canCastle.add(j === 0 ? 'Q' : 'K'); break;
+                        case 14:    piece = 'r'; canCastle.add(j === 0 ? 'q' : 'k'); break;
+                        case 15:    piece = 'k'; activeColor = 'b'; break;
                     }
                     board[i][j] = piece;
                     
@@ -214,7 +254,7 @@ export class ChessBoard {
             }
         }
 
-        return new ChessBoard(board, 'w', new Set(), '', 0, 1);
+        return new ChessBoard(board, activeColor, canCastle, enPassantTargetSquare, 0, 1);
     }
 
 }
