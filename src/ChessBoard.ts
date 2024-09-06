@@ -2,6 +2,7 @@ export class ChessBoard {
 
     static readonly VALID_PIECES = new Set('rnbkqpRNBKQP'.split(''));
     static readonly COLS_TO_LETTERS = 'abcdefgh'.split('');
+    static readonly LETTERS_TO_COLS = ChessBoard.COLS_TO_LETTERS.reduce<{[key: string]: number}>((acc, elem, idx) => { acc[elem] = idx; return acc; }, {});
 
     private board: string[][];
     private activeColor: string;
@@ -18,6 +19,12 @@ export class ChessBoard {
         this.enPassantTargetSquare = enPassantTargetSquare;
         this.halfMoveClock = halfMoveClock;
         this.fullMoveNumber = fullMoveNumber;
+    }
+
+
+    public copy(): ChessBoard {
+        return new ChessBoard(this.toArray(), this.activeColor, new Set(this.canCastle),
+                              this.enPassantTargetSquare, this.halfMoveClock, this.fullMoveNumber);
     }
 
     // Returns a copy of the internal representation array.
@@ -79,7 +86,7 @@ export class ChessBoard {
         }
 
         // Process enPassantTargetSquare
-        if (enPassantTargetSquare !== '-' && !/^[abcdefgh][36]$/.test(enPassantTargetSquare)) {
+        if (enPassantTargetSquare !== '-' && !/^[a-h][36]$/.test(enPassantTargetSquare)) {
             throw 'Invalid FEN en passant target square';
         }
 
@@ -106,8 +113,8 @@ export class ChessBoard {
             throw 'Invalid FEN fullmove number';
         }
 
-
-        return new ChessBoard(arrayBoard, activeColor, canCastle, enPassantTargetSquare, numHalfMoveClock, numFullMoveNumber);
+        return new ChessBoard(arrayBoard, activeColor, canCastle, enPassantTargetSquare === '-' ? '' : enPassantTargetSquare, 
+                              numHalfMoveClock, numFullMoveNumber);
     }
 
 
@@ -133,8 +140,210 @@ export class ChessBoard {
 
         const strCanCastle = this.canCastle.size == 0 ? '-' : [...this.canCastle].sort().join('');
 
-        return `${fenBoard} ${this.activeColor} ${strCanCastle} ${this.enPassantTargetSquare ?? '-'} ${this.halfMoveClock} ${this.fullMoveNumber}`;
+        return `${fenBoard} ${this.activeColor} ${strCanCastle} ${this.enPassantTargetSquare === '' ? '-' : this.enPassantTargetSquare} ${this.halfMoveClock} ${this.fullMoveNumber}`;
     }
+
+
+    private pieceColor(piece: string): string {
+        return /^[RNBKQP]$/.test(piece) ? 'w' : 'b';
+    }
+
+    public move(algMove: string) {
+        let shouldClearEnPassant = true;
+        algMove = algMove.replace(/[+#?!]+$/, '');
+
+        try {
+            let match;
+            if (algMove === 'O-O' || algMove === '0-0') {
+                // Kingside castle
+                if (!this.canCastle.has(this.activeColor === 'w' ? 'K' : 'k')) {
+                    throw 'canCastle false';
+                }
+
+                if (this.activeColor === 'w') {
+                    if (this.board[7][4] !== 'K' || this.board[7][5] !== '' || this.board[7][6] !== '' || this.board[7][7] !== 'R') {
+                        throw 'pieces not in legal places';
+                    }
+                    this.board[7][4] = '';
+                    this.board[7][5] = 'R';
+                    this.board[7][6] = 'K';
+                    this.board[7][7] = '';
+
+                    this.canCastle.delete('K');
+                    this.canCastle.delete('Q');
+                } else {
+                    if (this.board[0][4] !== 'k' || this.board[0][5] !== '' || this.board[0][6] !== '' || this.board[0][7] !== 'r') {
+                        throw 'pieces not in legal places';
+                    }
+
+                    this.board[0][4] = '';
+                    this.board[0][5] = 'r';
+                    this.board[0][6] = 'k';
+                    this.board[0][7] = '';
+
+                    this.canCastle.delete('k');
+                    this.canCastle.delete('q');
+                }
+                this.halfMoveClock++;
+
+            } else if (algMove === 'O-O-O' || algMove === '0-0-0') {
+                // Queenside castle
+                if (!this.canCastle.has(this.activeColor === 'w' ? 'Q' : 'q')) {
+                    throw 'canCastle false';
+                }
+
+                if (this.activeColor === 'w') {
+                    if (this.board[7][4] !== 'K' || this.board[7][3] !== '' || this.board[7][2] !== '' || this.board[7][1] !== '' ||
+                        this.board[7][0] !== 'R') {
+                        throw 'pieces not in legal places';
+                    }
+                    this.board[7][0] = '';
+                    this.board[7][1] = '';
+                    this.board[7][2] = 'K';
+                    this.board[7][3] = 'R';
+                    this.board[7][4] = '';
+
+                    this.canCastle.delete('K');
+                    this.canCastle.delete('Q');
+
+                } else {
+                    if (this.board[0][4] !== 'k' || this.board[0][3] !== '' || this.board[0][2] !== '' || this.board[0][1] !== '' || 
+                        this.board[0][0] !== 'r') {
+                        throw 'pieces not in legal places';
+                    }
+
+                    this.board[0][0] = '';
+                    this.board[0][1] = '';
+                    this.board[0][2] = 'k';
+                    this.board[0][3] = 'r';
+                    this.board[0][4] = '';
+
+                    this.canCastle.delete('k');
+                    this.canCastle.delete('q');
+                    
+                }
+                this.halfMoveClock++;
+
+            } else if ((match = algMove.match(/^([a-h])([1-8])(=[RNBQ])?$/))) {
+                // Pawn move
+                const [j, i] = [ChessBoard.LETTERS_TO_COLS[match[1]], 8 - parseInt(match[2])];
+                const promoPiece = match[3] ? match[3].substring(1) : '';
+
+                if (this.activeColor === 'w') {
+                    if (i >= 6) {
+                        throw 'white pawn moving to row 2 or 1';
+                    }
+                    if (i === 0 && promoPiece === '') {
+                        throw 'promotion info missing';
+                    }
+
+                    if (i === 4 && this.board[5][j] === '') {  // 2-space move
+                        if (this.board[6][j] !== 'P' || this.board[4][j] !== '') {
+                            throw 'pawn or space not there';
+                        }
+                        this.board[6][j] = '';
+                        this.board[4][j] = 'P';
+
+                        this.enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}3`;
+                        shouldClearEnPassant = false;
+                    } else {
+                        if (this.board[i + 1][j] !== 'P' || this.board[i][j] !== '') {
+                            throw 'pawn or space not there';
+                        }
+                        this.board[i][j] = (i === 0 ? promoPiece : 'P');
+                        this.board[i + 1][j] = '';
+                    }
+                } else {
+                    if (i <= 1) {
+                        throw 'Black pawn moving to row 7 or 8';
+                    }
+                    if (i === 7 && promoPiece === '') {
+                        throw 'promotion info missing';
+                    }
+
+                    if (i === 3 && this.board[2][j] === '') {  // 2-space move
+                        if (this.board[1][j] !== 'p' || this.board[3][j] !== '') {
+                            throw 'pawn or space not there';
+                        }
+                        this.board[1][j] = '';
+                        this.board[3][j] = 'p';
+
+                        this.enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}6`;
+                        shouldClearEnPassant = false;
+                    } else {
+                        if (this.board[i - 1][j] !== 'p' || this.board[i][j] !== '') {
+                            throw 'pawn or space not there';
+                        }
+                        this.board[i][j] = (i === 7 ? promoPiece.toLowerCase() : 'p');
+                        this.board[i - 1][j] = '';
+                    }
+                }
+
+                this.halfMoveClock = 0;
+            } else if (/^[a-h][18]=[RNBQrnbq]$/.test(algMove)) {
+                // Pawn move with promotion
+            } else if ((match = algMove.match(/^([a-h])x([a-h])([2-7])$/))) {
+                // Pawn capture
+                const [j1, j2, i] = [ChessBoard.LETTERS_TO_COLS[match[1]], ChessBoard.LETTERS_TO_COLS[match[2]], 8 - parseInt(match[3])];
+                if (Math.abs(j2 - j1) !== 1) {
+                    throw 'illegal pawn capture';
+                }
+
+                if (this.activeColor === 'w') {
+                    if (i === 6) {
+                        throw 'white pawn moving to row 2';
+                    }
+
+                    if (this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j2]}${8 - i}`) {
+                        this.board[i + 1][j1] = '';
+                        this.board[i + 1][j2] = '';
+                    } else {
+                        if (this.board[i + 1][j1] !== 'P' || !/^[rnbqp]$/.test(this.board[i][j2])) {
+                            throw 'pawn or piece to capture not there';
+                        }
+                        this.board[i + 1][j1] = '';    
+                    }
+
+                    this.board[i][j2] = 'P';
+                } else {
+                    if (i === 1) {
+                        throw 'Black pawn moving to row 7';
+                    }
+                    if (this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j2]}${8 - i}`) {
+                        this.board[i - 1][j1] = '';
+                        this.board[i - 1][j2] = '';
+                    } else {
+
+                        if (this.board[i - 1][j1] !== 'p' || !/^[RNBQP]$/.test(this.board[i][j2])) {
+                            throw 'pawn or piece to capture not there';
+                        }
+                        this.board[i - 1][j1] = '';
+                    }
+                    this.board[i][j2] = 'p';
+                }
+
+                this.halfMoveClock = 0;
+
+            } else if (/^[a-h]x[a-h][18]$/.test(algMove)) {
+                // Pawn capture with promotion
+            } else if (/[RNBQK][a-h]?[1-8]?[a-h][1-8]/.test(algMove)) {
+                // Piece move
+            } else if (/[RNBQK]x[a-h][1-8]/.test(algMove)) {
+                // Piece capture
+            }
+        } catch(err) {
+            throw `Illegal move ${algMove} - ${err}`
+        }
+
+        if (this.activeColor === 'b') {
+            this.fullMoveNumber++;
+        }
+        this.activeColor = this.activeColor === 'w' ? 'b' : 'w';
+        if (shouldClearEnPassant) {
+            this.enPassantTargetSquare = '';
+        }
+    }
+
 
     // Generates a compressed base-64 of the board.
     
@@ -208,7 +417,7 @@ export class ChessBoard {
         const canCastle = new Set<string>();
         let activeColor = 'w';
         let pieceNum = 0;
-        let enPassantTargetSquare = '-';
+        let enPassantTargetSquare = '';
         for (let i = 0; i < 8; i++) {
             board.push(Array(8).fill(''));
             for (let j = 0; j < 8; j++) {
@@ -255,5 +464,4 @@ export class ChessBoard {
 
         return new ChessBoard(board, activeColor, canCastle, enPassantTargetSquare, 0, 1);
     }
-
 }
