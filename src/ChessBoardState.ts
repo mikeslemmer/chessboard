@@ -1,8 +1,20 @@
-export class ChessBoard {
+export class ChessBoardState {
 
     static readonly VALID_PIECES = new Set('rnbkqpRNBKQP'.split(''));
     static readonly COLS_TO_LETTERS = 'abcdefgh'.split('');
-    static readonly LETTERS_TO_COLS = ChessBoard.COLS_TO_LETTERS.reduce<{[key: string]: number}>((acc, elem, idx) => { acc[elem] = idx; return acc; }, {});
+    static readonly LETTERS_TO_COLS = ChessBoardState.COLS_TO_LETTERS.reduce<{[key: string]: number}>((acc, elem, idx) => { acc[elem] = idx; return acc; }, {});
+    static readonly PIECE_MOVES: {[key: string]: number[][]} = {
+        K: [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1]],
+        N: [[1, 2], [-1, 2], [2, 1], [-2, 1], [-1, -2], [1, -2], [-2, -1], [2, -1]],
+        B: [[-7, -7], [-6, -6], [-5, -5], [-4, -4], [-3, -3], [-2, -2], [-1, -1], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7],
+            [-7, 7], [-6, 6], [-5, 5], [-4, 4], [-3, 3], [-2, 2], [-1, 1], [1, -1], [2, -2], [3, -3], [4, -4], [5, -5], [6, -6], [7, -7]],
+        R: [[-7, 0], [-6, 0], [-5, 0], [-4, 0], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
+            [0, -7], [0, -6], [0, -5], [0, -4], [0, -3], [0, -2], [0, -1], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]],
+        Q: [[-7, -7], [-6, -6], [-5, -5], [-4, -4], [-3, -3], [-2, -2], [-1, -1], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7],
+            [-7, 7], [-6, 6], [-5, 5], [-4, 4], [-3, 3], [-2, 2], [-1, 1], [1, -1], [2, -2], [3, -3], [4, -4], [5, -5], [6, -6], [7, -7],
+            [-7, 0], [-6, 0], [-5, 0], [-4, 0], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
+            [0, -7], [0, -6], [0, -5], [0, -4], [0, -3], [0, -2], [0, -1], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]]
+    };
 
     private board: string[][];
     private activeColor: string;
@@ -22,8 +34,8 @@ export class ChessBoard {
     }
 
 
-    public copy(): ChessBoard {
-        return new ChessBoard(this.toArray(), this.activeColor, new Set(this.canCastle),
+    public copy(): ChessBoardState {
+        return new ChessBoardState(this.toArray(), this.activeColor, new Set(this.canCastle),
                               this.enPassantTargetSquare, this.halfMoveClock, this.fullMoveNumber);
     }
 
@@ -32,7 +44,15 @@ export class ChessBoard {
         return JSON.parse(JSON.stringify(this.board));
     }
 
-    public static fromFEN(fen: string): ChessBoard {
+    public toPrintable(): string {
+        let ret: string = `${this.fullMoveNumber} ${this.activeColor}\n`;
+        for (let i = 0; i < 8; i++) {
+            ret += this.board[i].map((elem) => elem === '' ? '.' : elem).join(' ') + '\n';
+        }
+        return ret;
+    }
+
+    public static fromFEN(fen: string): ChessBoardState {
         const sections = fen.split(' ');
         if (sections.length !== 6) {
             throw 'Invalid FEN';
@@ -48,7 +68,7 @@ export class ChessBoard {
         const arrayBoard = splitBoard.map((row) => {
             const cols = row.split('');
             const ret = cols.reduce<string[]>((acc, col) => {
-                if (ChessBoard.VALID_PIECES.has(col)) {
+                if (ChessBoardState.VALID_PIECES.has(col)) {
                     acc.push(col);
                 } else {
                     try {
@@ -113,7 +133,7 @@ export class ChessBoard {
             throw 'Invalid FEN fullmove number';
         }
 
-        return new ChessBoard(arrayBoard, activeColor, canCastle, enPassantTargetSquare === '-' ? '' : enPassantTargetSquare, 
+        return new ChessBoardState(arrayBoard, activeColor, canCastle, enPassantTargetSquare === '-' ? '' : enPassantTargetSquare, 
                               numHalfMoveClock, numFullMoveNumber);
     }
 
@@ -148,7 +168,7 @@ export class ChessBoard {
         return /^[RNBKQP]$/.test(piece) ? 'w' : 'b';
     }
 
-    public move(algMove: string) {
+    public move(algMove: string): ChessBoardState {
         let shouldClearEnPassant = true;
         algMove = algMove.replace(/[+#?!]+$/, '');
 
@@ -226,7 +246,7 @@ export class ChessBoard {
 
             } else if ((match = algMove.match(/^([a-h])([1-8])(=[RNBQ])?$/))) {
                 // Pawn move
-                const [j, i] = [ChessBoard.LETTERS_TO_COLS[match[1]], 8 - parseInt(match[2])];
+                const [j, i] = [ChessBoardState.LETTERS_TO_COLS[match[1]], 8 - parseInt(match[2])];
                 const promoPiece = match[3] ? match[3].substring(1) : '';
 
                 if (this.activeColor === 'w') {
@@ -244,7 +264,7 @@ export class ChessBoard {
                         this.board[6][j] = '';
                         this.board[4][j] = 'P';
 
-                        this.enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}3`;
+                        this.enPassantTargetSquare = `${ChessBoardState.COLS_TO_LETTERS[j]}3`;
                         shouldClearEnPassant = false;
                     } else {
                         if (this.board[i + 1][j] !== 'P' || this.board[i][j] !== '') {
@@ -255,7 +275,7 @@ export class ChessBoard {
                     }
                 } else {
                     if (i <= 1) {
-                        throw 'Black pawn moving to row 7 or 8';
+                        throw 'black pawn moving to row 7 or 8';
                     }
                     if (i === 7 && promoPiece === '') {
                         throw 'promotion info missing';
@@ -268,7 +288,7 @@ export class ChessBoard {
                         this.board[1][j] = '';
                         this.board[3][j] = 'p';
 
-                        this.enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}6`;
+                        this.enPassantTargetSquare = `${ChessBoardState.COLS_TO_LETTERS[j]}6`;
                         shouldClearEnPassant = false;
                     } else {
                         if (this.board[i - 1][j] !== 'p' || this.board[i][j] !== '') {
@@ -280,36 +300,44 @@ export class ChessBoard {
                 }
 
                 this.halfMoveClock = 0;
-            } else if (/^[a-h][18]=[RNBQrnbq]$/.test(algMove)) {
-                // Pawn move with promotion
-            } else if ((match = algMove.match(/^([a-h])x([a-h])([2-7])$/))) {
+            } else if ((match = algMove.match(/^([a-h])x([a-h])([1-8])(=[RNBQ])?$/))) {
                 // Pawn capture
-                const [j1, j2, i] = [ChessBoard.LETTERS_TO_COLS[match[1]], ChessBoard.LETTERS_TO_COLS[match[2]], 8 - parseInt(match[3])];
+                const [j1, j2, i] = [ChessBoardState.LETTERS_TO_COLS[match[1]], ChessBoardState.LETTERS_TO_COLS[match[2]], 8 - parseInt(match[3])];
+                const promoPiece = match[4] ? match[4].substring(1) : '';
+
                 if (Math.abs(j2 - j1) !== 1) {
                     throw 'illegal pawn capture';
                 }
 
                 if (this.activeColor === 'w') {
-                    if (i === 6) {
+                    if (i >= 6) {
                         throw 'white pawn moving to row 2';
                     }
+                    if (i === 0 && promoPiece === '') {
+                        throw 'promotion info missing';
+                    }
 
-                    if (this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j2]}${8 - i}`) {
+                    if (this.enPassantTargetSquare === `${ChessBoardState.COLS_TO_LETTERS[j2]}${8 - i}`) {
                         this.board[i + 1][j1] = '';
                         this.board[i + 1][j2] = '';
                     } else {
                         if (this.board[i + 1][j1] !== 'P' || !/^[rnbqp]$/.test(this.board[i][j2])) {
+                            console.log(this.toPrintable());
                             throw 'pawn or piece to capture not there';
                         }
                         this.board[i + 1][j1] = '';    
                     }
 
-                    this.board[i][j2] = 'P';
+                    this.board[i][j2] = (i === 0 ? promoPiece : 'P');
                 } else {
-                    if (i === 1) {
-                        throw 'Black pawn moving to row 7';
+                    if (i <= 1) {
+                        throw 'black pawn moving to row 7';
                     }
-                    if (this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j2]}${8 - i}`) {
+                    if (i === 7 && promoPiece === '') {
+                        throw 'promotion info missing';
+                    }
+
+                    if (this.enPassantTargetSquare === `${ChessBoardState.COLS_TO_LETTERS[j2]}${8 - i}`) {
                         this.board[i - 1][j1] = '';
                         this.board[i - 1][j2] = '';
                     } else {
@@ -319,20 +347,61 @@ export class ChessBoard {
                         }
                         this.board[i - 1][j1] = '';
                     }
-                    this.board[i][j2] = 'p';
+                    this.board[i][j2] = (i === 7 ? promoPiece.toLowerCase() : 'p');
                 }
 
                 this.halfMoveClock = 0;
 
-            } else if (/^[a-h]x[a-h][18]$/.test(algMove)) {
-                // Pawn capture with promotion
-            } else if (/[RNBQK][a-h]?[1-8]?[a-h][1-8]/.test(algMove)) {
-                // Piece move
-            } else if (/[RNBQK]x[a-h][1-8]/.test(algMove)) {
-                // Piece capture
+            } else if ((match = algMove.match(/^([RNBQK])([a-h]?)([1-8]?)(x)?([a-h])([1-8])$/))) {
+                // Piece move or capture
+                const [_, piece, fromCol, fromRow, capture, toCol, toRow] = match;
+                const [j2, i2] = [ChessBoardState.LETTERS_TO_COLS[toCol], 8 - parseInt(toRow)];
+
+                const [j1, i1] = this.findPieceFromPos(piece, j2, i2, 
+                                                       fromCol ? ChessBoardState.LETTERS_TO_COLS[fromCol] : null, 
+                                                       fromRow ? 8 - parseInt(fromRow) : null);
+                if (capture && this.board[i1][j1] === '') {
+                    throw 'king capture target square empty';
+                }
+                this.board[i1][j1] = '';
+                this.board[i2][j2] = this.activeColor === 'w' ? piece : piece.toLowerCase();
+
+                if (capture) {
+                    this.halfMoveClock = 0;
+                } else {
+                    this.halfMoveClock++;
+                }
+                if (piece === 'K') {
+                    if (this.activeColor === 'b') {
+                        this.canCastle.delete('q');
+                        this.canCastle.delete('k');
+                    } else if (this.activeColor === 'w') {
+                        this.canCastle.delete('Q');
+                        this.canCastle.delete('K');
+                    }
+                }
+
+                if (piece === 'R') {
+                    if (this.activeColor === 'b' && i1 === 0) {
+                        if (j1 === 0) {
+                            this.canCastle.delete('q');
+                        } else if (j1 === 7) {
+                            this.canCastle.delete('k');
+                        }
+                    } else if (this.activeColor === 'w' && i1 === 7) {
+                        if (j1 === 0) {
+                            this.canCastle.delete('Q');
+                        } else if (j1 === 7) {
+                            this.canCastle.delete('K');
+                        }
+                    }
+                }
+
+            } else {
+                throw 'unknown move';
             }
         } catch(err) {
-            throw `Illegal move ${algMove} - ${err}`
+            throw `Illegal move ${algMove} - ${err}`;
         }
 
         if (this.activeColor === 'b') {
@@ -342,6 +411,8 @@ export class ChessBoard {
         if (shouldClearEnPassant) {
             this.enPassantTargetSquare = '';
         }
+
+        return this;
     }
 
 
@@ -359,14 +430,14 @@ export class ChessBoard {
                     let pieceCode: number;
                     switch(col) {
                         case 'P':
-                            if (i === 4 && this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j]}3`) {
+                            if (i === 4 && this.enPassantTargetSquare === `${ChessBoardState.COLS_TO_LETTERS[j]}3`) {
                                 pieceCode = 12;
                             } else {
                                 pieceCode = 0;
                             } 
                             break;
                         case 'p':
-                            if (i === 3 && this.enPassantTargetSquare === `${ChessBoard.COLS_TO_LETTERS[j]}6`) {
+                            if (i === 3 && this.enPassantTargetSquare === `${ChessBoardState.COLS_TO_LETTERS[j]}6`) {
                                 pieceCode = 12;
                             } else {
                                 pieceCode = 1;
@@ -411,7 +482,7 @@ export class ChessBoard {
     }
 
 
-    public static fromBase64(base64Str: string): ChessBoard {
+    public static fromBase64(base64Str: string): ChessBoardState {
         const buffer = Buffer.from(base64Str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (base64Str.length % 4)) % 4), 'base64');
         const board: string[][] = [];
         const canCastle = new Set<string>();
@@ -445,10 +516,10 @@ export class ChessBoard {
                         case 11:    piece = 'k'; break;
                         case 12:    
                             if (i === 3) {
-                                enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}6`;
+                                enPassantTargetSquare = `${ChessBoardState.COLS_TO_LETTERS[j]}6`;
                                 piece = 'p';
                             } else { // i === 5
-                                enPassantTargetSquare = `${ChessBoard.COLS_TO_LETTERS[j]}3`;
+                                enPassantTargetSquare = `${ChessBoardState.COLS_TO_LETTERS[j]}3`;
                                 piece = 'P';
                             }
                             break;
@@ -462,6 +533,46 @@ export class ChessBoard {
             }
         }
 
-        return new ChessBoard(board, activeColor, canCastle, enPassantTargetSquare, 0, 1);
+        return new ChessBoardState(board, activeColor, canCastle, enPassantTargetSquare, 0, 1);
     }
+
+    private moveIsPossible(piece: string, sourceCol: number, sourceRow: number, destCol: number, destRow: number): boolean {
+        if (piece === 'N' || piece === 'K') {
+            return true;
+        }
+        const colStep = (destCol === sourceCol ? 0 : (destCol > sourceCol ? 1 : -1));    
+        const rowStep = (destRow === sourceRow ? 0 : (destRow > sourceRow ? 1 : -1));
+
+        for (let i = sourceRow + rowStep, j = sourceCol + colStep; !(i === destRow && j === destCol); i += rowStep, j += colStep) {
+            if (this.board[i][j] !== '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private findPieceFromPos(piece: string, col: number, row: number, fromCol: number | null, fromRow: number | null): number[] {
+        let ret: number[] | null = null;
+        for (const move of ChessBoardState.PIECE_MOVES[piece]) {
+            const [i, j] = [row + move[0], col + move[1]];
+            if (i < 0 || i > 7 || j < 0 || j > 7) {
+                continue;
+            }
+            if ((fromCol !== null && j !== fromCol) || (fromRow !== null && i !== fromRow)) {
+                continue;
+            }
+
+            if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && this.moveIsPossible(piece, j, i, col, row)) {
+                if (ret) {
+                    throw `Multiple ${piece} found that could make move`;
+                }
+                ret = [j, i];
+            }
+        }
+        if (!ret) {
+            throw `${piece} not found`;
+        }
+        return ret;
+    }
+
 }

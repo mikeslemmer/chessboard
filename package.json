@@ -1,9 +1,9 @@
 {
-  "name": "chessboard",
+  "name": "ChessBoardState",
   "version": "1.0.0",
   "description": "Typescript class to manage chessboard representations",
-  "main": "dist/Board.js",
-  "types": "dist/Board.d.ts",
+  "main": "dist/ChessBoardState.js",
+  "types": "dist/ChessBoardState.d.ts",
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
